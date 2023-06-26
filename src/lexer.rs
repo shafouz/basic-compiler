@@ -1,4 +1,6 @@
-#[derive(Debug)]
+use std::fmt::Display;
+
+#[derive(Debug, PartialEq)]
 pub enum Token {
     Nop,
     Token(char),
@@ -6,11 +8,32 @@ pub enum Token {
     Relop(Relop),
     Number(u32),
     String(String),
-    Expression,
+    ClosingBracket(char),
+    OpeningBracket(char),
+}
+
+#[derive(Debug, strum::Display, strum::EnumString)]
+pub enum Reserved {
+    END,
+    RUN,
+    LIST,
+    CLEAR,
+    RETURN,
+    GOSUB,
+    LET,
+    INPUT,
+    GOTO,
+    THEN,
+    IF,
+    PRINT,
 }
 
 impl Token {
-    fn is_reserved(&self) -> bool {
+    pub fn is_number(&self) -> bool {
+        matches!(self, Token::Number(_))
+    }
+
+    pub fn is_reserved(&self) -> bool {
         let reserved = [
             "print", "if", "then", "goto", "input", "let", "gosub", "return", "clear", "list",
             "run", "end",
@@ -18,13 +41,13 @@ impl Token {
         .to_vec();
 
         match self {
-            Token::Id(string) => reserved.contains(&string.as_str()),
+            Token::Id(string) => reserved.contains(&string.to_ascii_lowercase().as_str()),
             _ => false,
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Relop {
     Equal,
     NotEqual,
@@ -39,14 +62,18 @@ pub fn lexer(expr: &str) -> Vec<Token> {
     let mut line = 0;
     let mut tokens = vec![];
 
-    while let Some(peek) = char_stream.next() {
-        if peek == '\n' {
+    let mut i = 0;
+    while let Some(next) = char_stream.next() {
+        if next == '\n' {
             line += 1;
-        } else if peek == '\t' || peek == ' ' {
+        } else if next == '\t' || next == ' ' {
             continue;
         }
 
-        let token = match peek {
+        // eprintln!("DEBUGPRINT[15]: lexer.rs:49: peek={:#?}, i={}", next, i);
+        // i += 1;
+
+        let token = match next {
             // can be <> <= <
             '<' => {
                 match char_stream.peek() {
@@ -84,14 +111,13 @@ pub fn lexer(expr: &str) -> Vec<Token> {
             }
             '=' => Token::Relop(Relop::Equal),
             'a'..='z' | 'A'..='Z' => {
-                let mut string = String::from(peek);
+                let mut string = String::from(next);
 
-                while let Some(next) = char_stream.peek() {
-                    if next.is_ascii_alphabetic() {
-                        string.push(*next);
+                while let Some(peek) = char_stream.peek() {
+                    if peek.is_ascii_alphabetic() {
+                        string.push(*peek);
                         char_stream.next();
                     } else {
-                        char_stream.next();
                         break;
                     }
                 }
@@ -99,11 +125,11 @@ pub fn lexer(expr: &str) -> Vec<Token> {
                 Token::Id(string)
             }
             '0'..='9' => {
-                let mut num = peek.to_digit(10).unwrap();
+                let mut num = next.to_digit(10).unwrap();
 
-                while let Some(next) = char_stream.peek() {
-                    if next.is_ascii_digit() {
-                        num = 10 * num + next.to_digit(10).unwrap();
+                while let Some(peek) = char_stream.peek() {
+                    if peek.is_ascii_digit() {
+                        num = 10 * num + peek.to_digit(10).unwrap();
                         char_stream.next();
                     } else {
                         break;
@@ -115,28 +141,30 @@ pub fn lexer(expr: &str) -> Vec<Token> {
             '"' => {
                 let mut string = String::new();
 
-                while let Some(next) = char_stream.peek() {
-                    if next == &'"' {
+                while let Some(peek) = char_stream.peek() {
+                    if *peek == '"' {
                         char_stream.next();
                         break;
+                    } else {
+                        string.push(*peek);
+                        char_stream.next();
                     }
-
-                    string.push(*next);
-                    char_stream.next();
                 }
 
                 Token::String(string)
             }
-            _ => Token::Token(peek),
+            '(' | ')' => {
+                if next == '(' {
+                    Token::OpeningBracket(next)
+                } else {
+                    Token::ClosingBracket(next)
+                }
+            }
+            _ => Token::Token(next),
         };
 
         tokens.push(token);
     }
 
-    eprintln!(
-        "DEBUGPRINT[2]: main.rs:78: tokens={:#?}, line={}",
-        tokens, line
-    );
-    // relops
     tokens
 }

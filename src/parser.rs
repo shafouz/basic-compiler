@@ -1,88 +1,70 @@
-use crate::lexer::Token;
+use std::str::FromStr;
+
+use crate::lexer::{Reserved, Token};
 
 pub fn parse(mut lex: Vec<Token>) {
-    // how to identify a var
-    // var is any token that matches the regex [A-Z]
-    // let token_stream = lex.into_iter();
-    let mut tokens = vec![];
+    // pop a token
+    // if it matches something keep going and pop as much as it needs
+    // if at some place there is an error
+    // restore from the start and try by poping n+1 tokens
 
-    while let Some(next) = lex.pop() {
-        tokens.push(next);
+    let mut lookahead = 0;
+    let mut index = 0;
+    // let amount_of_tokens = 1;
 
-        expr(&mut tokens);
-        // factor(&tokens);
-        // term(&tokens);
-    }
-}
+    // let token_pool = &lex[0..amount_of_tokens];
 
-fn expr(mut tokens: &mut Vec<Token>) -> Option<Expr> {
-    // check if first is op
-    // remove from vec if it is
-    let mut expr = Expr {
-        op: None,
-        term: None,
+    lex.reverse();
+    let token = &lex[index];
+    match token {
+        Token::Number(_) | Token::Id(_) => {
+            // how to recover if it fails?
+            if token.is_number() {
+                lookahead += 1;
+                statement(&lex, index, lookahead);
+            } else {
+                statement(&lex, index, lookahead);
+            }
+        }
+        _ => (),
     };
 
-    if let Token::Token(c) = tokens.remove(0) {
-        expr.op = Some(c);
-    }
-
-    let term = term(tokens);
-
-    None
+    // if let Some(token) = lex.pop() {
+    //     match token {
+    //         Token::Number(_) | Token::Id(_) => {
+    //             // do smth
+    //             statement(&lex);
+    //         }
+    //         _ => (),
+    //     };
+    // }
+    // starts with a number and ends with a CR
+    // line
 }
 
-struct Expr {
-    op: Option<char>,
-    term: Option<Term>,
-}
+fn statement(tokens: &[Token], index: usize, lookahead: usize) {
+    let token = &tokens[index];
 
-struct Term {
-    op: Option<char>,
-    factor: Option<Factor>,
-}
-
-enum Factor {
-    Var(char),
-    Number(u32),
-    Expr(Box<Expr>),
-    Nop,
-}
-
-fn term(tokens: &[Token]) -> Term {
-    // term ::= factor ((*|/) factor)*
-    factor(tokens);
-}
-
-// should return a Factor
-fn factor(tokens: &[Token]) -> Option<Factor> {
-    for token in tokens {
-        match token {
-            // var
-            Token::Id(id) => {
-                if id.len() == 1 {
-                    Some(Factor::Var(id.pop().unwrap()))
-                } else {
-                    None
-                }
+    if token.is_reserved() {
+        // match every reserved value
+        // match Reserved
+        if let Token::Id(id) = token {
+            match Reserved::from_str(id).unwrap() {
+                Reserved::PRINT => todo!(),
+                Reserved::RUN => todo!(),
+                Reserved::LIST => todo!(),
+                Reserved::CLEAR => todo!(),
+                Reserved::RETURN => todo!(),
+                Reserved::GOSUB => todo!(),
+                Reserved::LET => todo!(),
+                Reserved::INPUT => todo!(),
+                Reserved::GOTO => todo!(),
+                Reserved::THEN => todo!(),
+                Reserved::IF => todo!(),
+                Reserved::END => todo!(),
             }
-            // number
-            Token::Number(num) => Some(Factor::Number(*num)),
-            // expr
-            _ => {
-                expr(tokens);
-                None
-            }
-        };
+        }
+    } else {
+        // there has been an error since it needs to be an statement
     }
-
-    None
-}
-
-enum Grammar {
-    Expr,
-    Factor,
-    Term,
-    Number,
-    Var,
 }
