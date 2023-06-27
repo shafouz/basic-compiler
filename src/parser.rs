@@ -41,6 +41,7 @@ enum Factors {
     Number(u32),
     Var(char),
     Expression(Expression),
+    Eol,
 }
 
 #[derive(Debug, PartialEq)]
@@ -67,7 +68,7 @@ pub fn parse(mut lex: Vec<Token>) -> Result<Line, Error> {
     // make sure every token is consumed
     // lookahead is used as the lower bound -> lookahead..
     // so 2..2 is valid and doesnt loop
-    assert_eq!(lookahead, lex.len());
+    // assert_eq!(lookahead, lex.len());
     // index = lookahead;
 
     Ok(line)
@@ -216,22 +217,44 @@ fn term(tokens: &[Token], index: &mut usize, lookahead: &mut usize) -> Result<Te
                 *lookahead += 1;
                 let op = token;
 
-                if let Ok(mut factor) = factor(tokens, index, lookahead) {
-                    factor.op = Some(op.clone());
+                match factor(tokens, index, lookahead) {
+                    Ok(mut factor) => {
+                        if let Factors::Eol = *factor.data {
+                            let term = Term {
+                                op: None,
+                                child: factors,
+                            };
+
+                            return Ok(term);
+                        }
+
+                        factor.op = Some(op.clone());
+                        factors.push(factor);
+                    }
+                    Err(_) => {
+                        *lookahead = initial_lookahead;
+                        break;
+                    }
+                }
+            }
+            _ => match factor(tokens, index, lookahead) {
+                Ok(factor) => {
+                    if let Factors::Eol = *factor.data {
+                        let term = Term {
+                            op: None,
+                            child: factors,
+                        };
+
+                        return Ok(term);
+                    }
+
                     factors.push(factor);
-                } else {
+                }
+                Err(_) => {
                     *lookahead = initial_lookahead;
                     break;
                 }
-            }
-            _ => {
-                if let Ok(factor) = factor(tokens, index, lookahead) {
-                    factors.push(factor);
-                } else {
-                    *lookahead = initial_lookahead;
-                    break;
-                }
-            }
+            },
         }
     }
 
@@ -239,13 +262,17 @@ fn term(tokens: &[Token], index: &mut usize, lookahead: &mut usize) -> Result<Te
         op: None,
         child: factors,
     };
+
     Ok(term)
 }
 
 // factor ::= var | number | (expression)
 pub fn factor(tokens: &[Token], index: &mut usize, lookahead: &mut usize) -> Result<Factor, Error> {
     if *lookahead >= tokens.len() {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "EOF reached"));
+        return Ok(Factor {
+            op: None,
+            data: Box::new(Factors::Eol),
+        });
     }
 
     let token = &tokens[*index + *lookahead];

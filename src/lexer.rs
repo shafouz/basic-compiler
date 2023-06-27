@@ -175,7 +175,7 @@ pub fn lexer(expr: &str) -> Vec<Token> {
                     Token::Slash
                 }
             }
-            _ => Token::Other(next),
+            _ => panic!("Unknown character: {}", next),
         };
 
         tokens.push(token);
