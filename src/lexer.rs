@@ -1,18 +1,24 @@
-use std::fmt::Display;
+use std::{fmt::Display, str::FromStr};
 
-#[derive(Debug, PartialEq)]
+use strum::VariantNames;
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
-    Nop,
-    Token(char),
-    Id(String),
+    Other(char),
+    Var(char),
     Relop(Relop),
     Number(u32),
     String(String),
     ClosingBracket(char),
     OpeningBracket(char),
+    Reserved(Reserved),
+    Plus,
+    Minus,
+    Asterisk,
+    Slash,
 }
 
-#[derive(Debug, strum::Display, strum::EnumString)]
+#[derive(Debug, strum::Display, strum::EnumString, strum::EnumVariantNames, PartialEq, Clone)]
 pub enum Reserved {
     END,
     RUN,
@@ -32,22 +38,9 @@ impl Token {
     pub fn is_number(&self) -> bool {
         matches!(self, Token::Number(_))
     }
-
-    pub fn is_reserved(&self) -> bool {
-        let reserved = [
-            "print", "if", "then", "goto", "input", "let", "gosub", "return", "clear", "list",
-            "run", "end",
-        ]
-        .to_vec();
-
-        match self {
-            Token::Id(string) => reserved.contains(&string.to_ascii_lowercase().as_str()),
-            _ => false,
-        }
-    }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Relop {
     Equal,
     NotEqual,
@@ -122,7 +115,13 @@ pub fn lexer(expr: &str) -> Vec<Token> {
                     }
                 }
 
-                Token::Id(string)
+                if string.len() == 1 {
+                    Token::Var(string.chars().next().unwrap())
+                } else if Reserved::VARIANTS.contains(&string.to_ascii_uppercase().as_str()) {
+                    Token::Reserved(Reserved::from_str(&string.to_ascii_uppercase()).unwrap())
+                } else {
+                    panic!("Unknown identifier: {}", string);
+                }
             }
             '0'..='9' => {
                 let mut num = next.to_digit(10).unwrap();
@@ -160,7 +159,21 @@ pub fn lexer(expr: &str) -> Vec<Token> {
                     Token::ClosingBracket(next)
                 }
             }
-            _ => Token::Token(next),
+            '+' | '-' => {
+                if next == '+' {
+                    Token::Plus
+                } else {
+                    Token::Minus
+                }
+            }
+            '*' | '/' => {
+                if next == '*' {
+                    Token::Asterisk
+                } else {
+                    Token::Slash
+                }
+            }
+            _ => Token::Other(next),
         };
 
         tokens.push(token);
