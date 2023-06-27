@@ -18,7 +18,9 @@ pub enum Token {
     Slash,
 }
 
-#[derive(Debug, strum::Display, strum::EnumString, strum::EnumVariantNames, PartialEq, Clone)]
+#[derive(
+    Debug, strum::Display, strum::EnumString, strum::EnumVariantNames, PartialEq, Clone, Copy,
+)]
 pub enum Reserved {
     END,
     RUN,

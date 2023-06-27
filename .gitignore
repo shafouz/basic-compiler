@@ -1,3 +1,4 @@
 /target
 /TinyBASIC
 /tests/data
+Cargo.lock

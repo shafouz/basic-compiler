@@ -2,9 +2,11 @@
 name = "basic-compiler"
 version = "0.1.0"
 edition = "2021"
+default-run = "basic-compiler"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ptree = "0.4.0"
 strum = { version = "0.25.0", features = ["derive", "strum_macros"] }
 # strum = { version = "0.24.1", features = ["strum_macros", "derive"] }

@@ -1,187 +1,36 @@
-use std::{
-    io::{self, Error},
-    str::FromStr,
-};
+use std::io::{self, Error};
 
-use crate::lexer::{Reserved, Token};
+use crate::lexer::{Relop, Reserved, Token};
 
-pub fn parse(mut lex: Vec<Token>) {
-    // pop a token
-    // if it matches something keep going and pop as much as it needs
-    // if at some place there is an error
-    // restore from the start and try by poping n+1 tokens
-
-    let mut lookahead = 0;
-    let mut index = 0;
-    // let amount_of_tokens = 1;
-
-    // let token_pool = &lex[0..amount_of_tokens];
-
-    lex.reverse();
-    line(&lex, index, lookahead);
-
-    // if let Some(token) = lex.pop() {
-    //     match token {
-    //         Token::Number(_) | Token::Id(_) => {
-    //             // do smth
-    //             statement(&lex);
-    //         }
-    //         _ => (),
-    //     };
-    // }
-    // starts with a number and ends with a CR
-    // line
-}
-
-fn line(tokens: &[Token], mut index: usize, mut lookahead: usize) {
-    let token = &tokens[index + lookahead];
-
-    // line resets the lookahead
-    match token {
-        Token::Number(_) => {
-            let num = token;
-            lookahead += 1;
-            statement(tokens, index, lookahead);
-        }
-        _ => statement(tokens, index, lookahead),
-    };
-}
-
-fn statement(tokens: &[Token], mut index: usize, mut lookahead: usize) {
-    let token = &tokens[index + lookahead];
-
-    if let Token::Reserved(keyword) = token {
-        match keyword {
-            Reserved::END => todo!(),
-            Reserved::RUN => todo!(),
-            Reserved::LIST => todo!(),
-            Reserved::CLEAR => todo!(),
-            Reserved::RETURN => todo!(),
-            Reserved::GOSUB => todo!(),
-            Reserved::LET => todo!(),
-            Reserved::INPUT => todo!(),
-            Reserved::GOTO => {
-                let reserved = token;
-                lookahead += 1;
-                expression(tokens, index, lookahead);
-            }
-            Reserved::THEN => todo!(),
-            Reserved::IF => todo!(),
-            Reserved::PRINT => todo!(),
-        }
-    } else {
-        // throw error, invalid statement
-    }
-}
-
-// expression ::= (+|-|ε) term ((+|-) term)*
-fn expression(
-    tokens: &[Token],
-    mut index: usize,
-    mut lookahead: usize,
-) -> Result<Expression, Error> {
-    let token = &tokens[index + lookahead];
-    let mut terms: Vec<Term> = vec![];
-
-    // return early if initial one fails
-    let initial_lookahead = lookahead;
-    match token {
-        Token::Plus | Token::Minus => {
-            let op = token;
-            lookahead += 1;
-
-            if let Ok(mut term) = term(tokens, index, lookahead) {
-                term.op = Some(op.clone());
-                terms.push(term);
-            } else {
-                lookahead = initial_lookahead;
-                return Err(Error::new(io::ErrorKind::InvalidInput, "Invalid term"));
-            }
-        }
-        _ => {
-            if let Ok(term) = term(tokens, index, lookahead) {
-                terms.push(term);
-            } else {
-                lookahead = initial_lookahead;
-                return Err(Error::new(io::ErrorKind::InvalidInput, "Invalid term"));
-            }
-        }
-    };
-
-    let initial_lookahead = lookahead;
-    for token in &tokens[index + lookahead..] {
-        match token {
-            Token::Plus | Token::Minus => {
-                let op = token;
-                lookahead += 1;
-
-                if let Ok(mut term) = term(tokens, index, lookahead) {
-                    term.op = Some(op.clone());
-                    terms.push(term);
-                } else {
-                    lookahead = initial_lookahead;
-                    break;
-                }
-            }
-            _ => {
-                if let Ok(term) = term(tokens, index, lookahead) {
-                    terms.push(term);
-                } else {
-                    lookahead = initial_lookahead;
-                    break;
-                }
-            }
-        }
-    }
-
-    let expression = Expression { child: terms };
-    Ok(expression)
-}
-
-// term ::= factor ((*|/) factor)*
-fn term(tokens: &[Token], mut index: usize, mut lookahead: usize) -> Result<Term, Error> {
-    // one or more factors
-    // do one, try to do in a loop until an error?
-
-    // case one factor
-    let mut factors: Vec<Factor> = vec![factor(tokens, index, lookahead)?];
-
-    // any number of factors
-    let initial_lookahead = lookahead;
-    for token in &tokens[index + lookahead..] {
-        match token {
-            Token::Asterisk | Token::Slash => {
-                lookahead += 1;
-                let op = token;
-
-                if let Ok(mut factor) = factor(tokens, index, lookahead) {
-                    factor.op = Some(op.clone());
-                    factors.push(factor);
-                } else {
-                    lookahead = initial_lookahead;
-                    break;
-                }
-            }
-            _ => {
-                if let Ok(factor) = factor(tokens, index, lookahead) {
-                    factors.push(factor);
-                } else {
-                    lookahead = initial_lookahead;
-                    break;
-                }
-            }
-        }
-    }
-
-    let term = Term {
-        op: None,
-        child: factors,
-    };
-    Ok(term)
+#[derive(Debug, PartialEq)]
+pub struct Line {
+    number: Option<u32>,
+    statement: Statement,
 }
 
 #[derive(Debug, PartialEq)]
-struct Factor {
+struct Statement {
+    reserved: Reserved,
+    child: StatementType,
+}
+
+#[derive(Debug, PartialEq)]
+struct VarList {}
+
+#[derive(Debug, PartialEq)]
+struct ExprList {}
+
+#[derive(Debug, PartialEq)]
+enum StatementType {
+    Expression(Expression),
+    VarList(VarList),
+    ExprList(ExprList),
+    IfThen((Expression, Relop, Expression, Box<Statement>)),
+    Singleton,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Factor {
     op: Option<Token>,
     data: Box<Factors>,
 }
@@ -205,13 +54,208 @@ struct Term {
     child: Vec<Factor>,
 }
 
-// factor ::= var | number | (expression)
-fn factor(tokens: &[Token], mut index: usize, mut lookahead: usize) -> Result<Factor, Error> {
-    let token = &tokens[index + lookahead];
+pub fn parse(mut lex: Vec<Token>) -> Result<Line, Error> {
+    // pop a token
+    // if it matches something keep going and pop as much as it needs
+    // if at some place there is an error
+    // restore from the start and try by poping n+1 tokens
 
+    let mut lookahead = 0;
+    let mut index = 0;
+
+    let line = line(&lex, &mut index, &mut lookahead)?;
+    // make sure every token is consumed
+    // lookahead is used as the lower bound -> lookahead..
+    // so 2..2 is valid and doesnt loop
+    assert_eq!(lookahead, lex.len());
+    // index = lookahead;
+
+    Ok(line)
+}
+
+fn line(tokens: &[Token], index: &mut usize, lookahead: &mut usize) -> Result<Line, Error> {
+    let token = &tokens[*index + *lookahead];
+
+    // line resets the lookahead
     match token {
+        Token::Number(number) => {
+            *lookahead += 1;
+            let _statement = statement(tokens, index, lookahead)?;
+            Ok(Line {
+                number: Some(*number),
+                statement: _statement,
+            })
+        }
+        _ => {
+            // None
+            let _statement = statement(tokens, index, lookahead)?;
+
+            Ok(Line {
+                number: None,
+                statement: _statement,
+            })
+        }
+    }
+}
+
+fn statement(
+    tokens: &[Token],
+    index: &mut usize,
+    lookahead: &mut usize,
+) -> Result<Statement, Error> {
+    let token = &tokens[*index + *lookahead];
+
+    if let Token::Reserved(keyword) = token {
+        match keyword {
+            Reserved::END => todo!(),
+            Reserved::RUN => todo!(),
+            Reserved::LIST => todo!(),
+            Reserved::CLEAR => todo!(),
+            Reserved::RETURN => todo!(),
+            Reserved::GOSUB => todo!(),
+            Reserved::LET => todo!(),
+            Reserved::INPUT => todo!(),
+            Reserved::GOTO => {
+                *lookahead += 1;
+
+                // unrecoverable error
+                let expr = expression(tokens, index, lookahead)?;
+
+                Ok(Statement {
+                    reserved: *keyword,
+                    child: StatementType::Expression(expr),
+                })
+            }
+            Reserved::THEN => todo!(),
+            Reserved::IF => todo!(),
+            Reserved::PRINT => todo!(),
+        }
+    } else {
+        // throw error, invalid statement
+        Err(Error::new(io::ErrorKind::InvalidInput, "Invalid statement"))
+    }
+}
+
+// expression ::= (+|-|ε) term ((+|-) term)*
+fn expression(
+    tokens: &[Token],
+    index: &mut usize,
+    lookahead: &mut usize,
+) -> Result<Expression, Error> {
+    let token = &tokens[*index + *lookahead];
+    let mut terms: Vec<Term> = vec![];
+
+    // return early if initial one fails
+    let initial_lookahead = *lookahead;
+    match token {
+        Token::Plus | Token::Minus => {
+            let op = token;
+            *lookahead += 1;
+
+            if let Ok(mut term) = term(tokens, index, lookahead) {
+                term.op = Some(op.clone());
+                terms.push(term);
+            } else {
+                *lookahead = initial_lookahead;
+                return Err(Error::new(io::ErrorKind::InvalidInput, "Invalid term"));
+            }
+        }
+        _ => {
+            if let Ok(term) = term(tokens, index, lookahead) {
+                terms.push(term);
+            } else {
+                *lookahead = initial_lookahead;
+                return Err(Error::new(io::ErrorKind::InvalidInput, "Invalid term"));
+            }
+        }
+    };
+
+    let initial_lookahead = *lookahead;
+    for token in &tokens[*index + *lookahead..] {
+        match token {
+            Token::Plus | Token::Minus => {
+                let op = token;
+                *lookahead += 1;
+
+                if let Ok(mut term) = term(tokens, index, lookahead) {
+                    term.op = Some(op.clone());
+                    terms.push(term);
+                } else {
+                    *lookahead = initial_lookahead;
+                    break;
+                }
+            }
+            _ => {
+                if let Ok(term) = term(tokens, index, lookahead) {
+                    terms.push(term);
+                } else {
+                    *lookahead = initial_lookahead;
+                    break;
+                }
+            }
+        }
+    }
+
+    let expression = Expression { child: terms };
+    Ok(expression)
+}
+
+// term ::= factor ((*|/) factor)*
+fn term(tokens: &[Token], index: &mut usize, lookahead: &mut usize) -> Result<Term, Error> {
+    // one or more factors
+    // do one, try to do in a loop until an error?
+
+    // case one factor
+    let mut factors: Vec<Factor> = vec![factor(tokens, index, lookahead)?];
+
+    // any number of factors
+    let initial_lookahead = *lookahead;
+    for token in &tokens[*index + *lookahead..] {
+        match token {
+            Token::Asterisk | Token::Slash => {
+                *lookahead += 1;
+                let op = token;
+
+                if let Ok(mut factor) = factor(tokens, index, lookahead) {
+                    factor.op = Some(op.clone());
+                    factors.push(factor);
+                } else {
+                    *lookahead = initial_lookahead;
+                    break;
+                }
+            }
+            _ => {
+                if let Ok(factor) = factor(tokens, index, lookahead) {
+                    factors.push(factor);
+                } else {
+                    *lookahead = initial_lookahead;
+                    break;
+                }
+            }
+        }
+    }
+
+    let term = Term {
+        op: None,
+        child: factors,
+    };
+    Ok(term)
+}
+
+// factor ::= var | number | (expression)
+pub fn factor(tokens: &[Token], index: &mut usize, lookahead: &mut usize) -> Result<Factor, Error> {
+    if *lookahead >= tokens.len() {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "EOF reached"));
+    }
+
+    let token = &tokens[*index + *lookahead];
+
+    #[allow(clippy::let_and_return)]
+    let factor = match token {
         Token::Number(num) => {
             // terminal number
+            *lookahead += 1;
+
             Ok(Factor {
                 op: None,
                 data: Box::new(Factors::Number(*num)),
@@ -219,6 +263,8 @@ fn factor(tokens: &[Token], mut index: usize, mut lookahead: usize) -> Result<Fa
         }
         Token::Var(var) => {
             // terminal var
+            *lookahead += 1;
+
             Ok(Factor {
                 op: None,
                 data: Box::new(Factors::Var(*var)),
@@ -238,40 +284,77 @@ fn factor(tokens: &[Token], mut index: usize, mut lookahead: usize) -> Result<Fa
             } else {
                 Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
-                    "could not create expression",
+                    "Could not create expression",
                 ))
             }
         }
-    }
+    };
+
+    factor
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::lexer;
+
     use super::*;
 
     #[test]
-    fn test_factor() {
-        let tokens = vec![Token::Number(1)];
-        let index = 0;
-        let lookahead = 0;
+    fn goto_works() {
+        let lex = lexer::lexer("1 goto 1");
+        let parse = parse(lex);
 
-        let res = factor(&tokens, index, lookahead);
-        eprintln!("DEBUGPRINT[4]: parser.rs:263: res={:#?}", res);
+        if let Ok(line) = parse {
+            assert!(line.number.is_some());
+            let statement = line.statement;
+            assert_eq!(statement.reserved, Reserved::GOTO);
+
+            if let StatementType::Expression(expr) = statement.child {
+                assert_eq!(expr.child.len(), 1);
+
+                let term = &expr.child[0];
+                assert_eq!(term.op, None);
+
+                assert_eq!(term.child.len(), 1);
+                let factor = &term.child[0];
+
+                assert_eq!(factor.op, None);
+                assert_eq!(factor.data, Box::new(Factors::Number(1)));
+            } else {
+                panic!("Wrong Expression type")
+            }
+        } else {
+            panic!("Parse failed")
+        }
     }
 
     #[test]
-    fn test_factor_expr() {
-        let tokens = vec![Token::Plus, Token::Number(1)];
-        let index = 0;
-        let lookahead = 0;
+    fn goto_works_without_line_number() {
+        let lex = lexer::lexer("goto 1");
+        let parse = parse(lex);
 
-        let res = factor(&tokens, index, lookahead);
-        eprintln!("DEBUGPRINT[5]: parser.rs:273: res={:#?}", res);
+        if let Ok(line) = parse {
+            assert!(line.number.is_none());
+            let statement = line.statement;
+            assert_eq!(statement.reserved, Reserved::GOTO);
 
-        // if let Factors::Expression(_) = *res.data {
-        // } else {
-        //     panic!("should be an expression");
-        // }
+            if let StatementType::Expression(expr) = statement.child {
+                assert_eq!(expr.child.len(), 1);
+
+                let term = &expr.child[0];
+                assert_eq!(term.op, None);
+
+                assert_eq!(term.child.len(), 1);
+                let factor = &term.child[0];
+
+                assert_eq!(factor.op, None);
+                assert_eq!(factor.data, Box::new(Factors::Number(1)));
+            } else {
+                panic!("Wrong Expression type")
+            }
+        } else {
+            panic!("Parse failed")
+        }
     }
 
     #[test]
@@ -286,5 +369,15 @@ mod tests {
 
         assert!(i == 99);
         assert_eq!(v.len(), 100);
+    }
+
+    #[test]
+    fn zero_loops_slice() {
+        let i = vec![0; 2];
+
+        for x in &i[2..] {
+            eprintln!("DEBUGPRINT[1]: parser.rs:317: x={:#?}", x);
+            panic!("aaaaa");
+        }
     }
 }
